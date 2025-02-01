@@ -14,7 +14,7 @@ resource "aws_internet_gateway" "gw" {
   vpc_id = aws_vpc.vpc.id
 
   tags = {
-    Name = "app-igw1"
+    Name = "app-igw"
   }
 }
 
@@ -27,9 +27,6 @@ resource "aws_nat_gateway" "nat" {
   tags = {
     Name = "app_Nat"
   }
-
-  # To ensure proper ordering, it is recommended to add an explicit dependency
-  # on the Internet Gateway for the VPC.
   depends_on = [aws_internet_gateway.gw]
 }
 
@@ -93,7 +90,7 @@ resource "aws_subnet" "prv1_subnet" {
 # prv2 subnet
 resource "aws_subnet" "prv2_subnet" {
   vpc_id                  = aws_vpc.vpc.id
-  cidr_block              = var.prv1_subnet_cidr_block
+  cidr_block              = var.prv2_subnet_cidr_block
   availability_zone       = data.aws_availability_zones.az_list.names[1]
 
   tags   = {
@@ -122,18 +119,40 @@ resource "aws_lb" "nlb" {
   for_each = {
     frontend = {
       internal = false
-      subnet   = aws_subnet.pub2_subnet.id
+      subnet   = [aws_subnet.pub1_subnet.id, aws_subnet.pub2_subnet.id]
     },
     backend = {
       internal = true
-      subnet   = aws_subnet.prv2_subnet.id
+      subnet   = [aws_subnet.prv1_subnet.id, aws_subnet.prv2_subnet.id]
     }
   }
   name               = "${each.key}-app-nlb"
   internal           = each.value.internal
   load_balancer_type = "network"
-  subnets            = [each.value.subnet]
+  subnets            = each.value.subnet
 }
+
+#load balancer target group
+resource "aws_lb_target_group" "lb_tg" {
+  count    = 2
+  name     = "${count.index == 0 ? "frontend" : "backend"}-lb-tg"
+  port     = 80
+  protocol = "HTTP"
+  vpc_id   = aws_vpc.vpc.id
+}
+
+#lb listener
+resource "aws_lb_listener" "listener" {
+  for_each           = aws_lb.nlb
+  load_balancer_arn  = each.value.arn
+  port               = 80
+  protocol           = "HTTP"
+  default_action {
+    type             = "forward"
+    target_group_arn = each.key == "frontend" ? aws_lb_target_group.lb_tg[0].arn : aws_lb_target_group.lb_tg[1].arn
+  }
+}
+
 
 # Prv Subnets Route table
 resource "aws_route_table" "prv_routes" {
