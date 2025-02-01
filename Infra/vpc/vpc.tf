@@ -66,7 +66,7 @@ resource "aws_subnet" "pub2_subnet" {
   }
 }
 
-# Nat Gateway subnet
+# pub3 subnet
 resource "aws_subnet" "pub3_subnet" {
   vpc_id                  = aws_vpc.vpc.id
   cidr_block              = var.pub3_subnet_cidr_block
@@ -102,7 +102,6 @@ resource "aws_subnet" "prv2_subnet" {
 }
 
 
-
 # Nat Gateway Subnet Route table
 resource "aws_route_table" "nat_routes" {
   vpc_id = aws_vpc.vpc.id
@@ -116,6 +115,24 @@ resource "aws_route_table" "nat_routes" {
   tags   = {
     Name = "nat_rt"
   }
+}
+
+#Load Balancer
+resource "aws_lb" "nlb" {
+  for_each = {
+    frontend = {
+      internal = false
+      subnet   = aws_subnet.pub2_subnet.id
+    },
+    backend = {
+      internal = true
+      subnet   = aws_subnet.prv2_subnet.id
+    }
+  }
+  name               = "${each.key}-app-nlb"
+  internal           = each.value.internal
+  load_balancer_type = "network"
+  subnets            = [each.value.subnet]
 }
 
 # Prv Subnets Route table
