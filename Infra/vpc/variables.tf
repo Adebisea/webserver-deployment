@@ -26,11 +26,11 @@ variable "pub3_subnet_cidr_block" {
 variable "prv1_subnet_cidr_block" {
 
     type = string
-    default = "192.168.12.0/24"
+    default = "192.168.10.0/24"
 }
 
 variable "prv2_subnet_cidr_block" {
 
     type = string
-    default = "192.168.10.0/24"
+    default = "192.168.12.0/24"
 }
